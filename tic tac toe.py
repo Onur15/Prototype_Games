@@ -41,20 +41,18 @@ class Game:
                 if x == 0:
                     value = False
         return value        
-    def win(self, x, y):
-        print(self.board[y][x], "Wins!")
     def win_detection(self):
         s = self.board
         for i in range(3):
             if (len({s[i][j], s[i][j+1], s[i][j+2]}) == 1) and s[i][j] != 0:
-                self.win(j,i)
+                print(s[i][j], "Wins!")
                 return True
         for j in range(3):
             if (len({s[i][j], s[i+1][j], s[i+2][j]}) == 1) and s[i][j] != 0:
-                self.win(j,i)
+                print(s[i][j], "Wins!")
                 return True
         if ((len({s[0][0], s[1][1], s[2][2]}) == 1) or (len({s[0][2], s[1][1], s[2][0]}) == 1)) and s[1][1] != 0:
-            self.win(1,1)
+            print(s[1][1], "Wins!")
             return True
     def print_board(self):
         print()
