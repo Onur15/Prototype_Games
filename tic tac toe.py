@@ -7,34 +7,31 @@ class Game:
         self.board = board
     def play(self):
         self.blank_board()
-        turn = "Player_1"
+        turn = True
         while not self.full():
-            if turn == "Player_1":
+            if turn:
                 print("Player 1's turn.")
-                inp = int(input("0,1,2\n3,4,5\n6,7,8  "))
-                select_column = inp%3
-                select_row = inp//3
-                if self.board[select_row][select_column] == 0:
-                    self.board[select_row][select_column] = "X"
-                    self.print_board()
-                    if self.win_detection():
-                        break
-                    turn = "Player_2"
-                else:
-                    print("Please select an empty square.", end = "\n\n")
-            if turn == "Player_2" and not self.full():
+                symbol = "X"
+            else:
                 print("Player 2's turn.")
-                inp = int(input("0,1,2\n3,4,5\n6,7,8\n"))
-                select_column = inp%3
-                select_row = inp//3
-                if self.board[select_row][select_column] == 0:
-                    self.board[select_row][select_column] = "O"
-                    self.print_board()
-                    if self.win_detection():
-                        break
-                    turn = "Player_1"
+                symbol = "O"
+            print("0,1,2\n3,4,5\n6,7,8")
+            while True:
+                inp = int(input())
+                if inp in (0,1,2,3,4,5,6,7,8):
+                    break
                 else:
-                    print("Please select an empty square.", end="\n\n")
+                    print("Please select valid area.")
+            select_column = inp%3
+            select_row = inp//3
+            if self.board[select_row][select_column] == 0:
+                self.board[select_row][select_column] = symbol
+                self.print_board()
+                if self.win_detection():
+                    break
+                turn = not turn
+            else:
+                print("Please select an empty square.", end = "\n\n")
         if self.full():
             print("Tie!")
     def full(self):
@@ -47,24 +44,17 @@ class Game:
     def win(self, x, y):
         print(self.board[y][x], "Wins!")
     def win_detection(self):
-        i = j = 0
         s = self.board
-        while i <= 2:
+        for i in range(3):
             if (len({s[i][j], s[i][j+1], s[i][j+2]}) == 1) and s[i][j] != 0:
                 self.win(j,i)
                 return True
-            else:
-                i+=1
-        i = j = 0
-        while j <= 2:
+        for j in range(3):
             if (len({s[i][j], s[i+1][j], s[i+2][j]}) == 1) and s[i][j] != 0:
                 self.win(j,i)
                 return True
-            else:
-                j += 1
-        i = j = 0
-        if ((len({s[i][j], s[i+1][j+1], s[i+2][j+2]}) == 1) or (len({s[i][j+2], s[i+1][j+1], s[i+2][j]}) == 1)) and s[i+1][j+1] != 0:
-            self.win(j+1,i+1)
+        if ((len({s[0][0], s[1][1], s[2][2]}) == 1) or (len({s[0][2], s[1][1], s[2][0]}) == 1)) and s[1][1] != 0:
+            self.win(1,1)
             return True
     def print_board(self):
         print()
