@@ -48,6 +48,7 @@ class Game:
                 print("Please select an empty square.", end = "\n\n")
         if self.full(): #Tie
             print("Tie!")
+            quit()
     def computer(self):
         global s
         s = self.board
@@ -69,10 +70,20 @@ class Game:
                         return c*3 + i
                     a1,b1,c1 = a,b,c
                     a,b,c = c1,a1,b1
-        if s[0][0]==s[1][1] and s[0][0]=="X" and s[2][2]=="O" or s[1][1]==s[2][2] and s[1][1]=="X" and s[0][0]=="O": #don't being tricked
-            return random.choices((2,6))[0]
-        if s[0][2]==s[1][1] and s[0][2]=="X" and s[2][0]=="O" or s[2][0]==s[1][1] and s[2][0]=="X" and s[0][2]=="O":
-            return random.choices((0,8))[0]
+        if s[0][0]==s[1][1] and s[0][0]=="X" and s[2][2]=="O" or s[1][1]==s[2][2] and s[1][1]=="X" and s[0][0]=="O":#don't being tricked
+            if s[0][2]==0 and s[2][0]==0:
+                return random.choices((2,6))[0]
+            elif s[0][2]==0:
+                return 2
+            elif s[2][0]==0:
+                return 6
+        if s[0][2]==s[1][1] and s[0][2]=="X" and s[2][0]=="O" or s[2][0]==s[1][1] and s[2][0]=="X" and s[0][2]=="O" and (s[0][0]==0 or s[2][2]):
+            if s[0][0]==0 and s[2][2]==0:
+                return random.choices((0,8))[0]
+            elif s[0][0]==0:
+                return 0
+            elif s[2][2]==0:
+                return 8
         if s[0][0]==s[2][2] and s[0][0]=="X" or s[0][2]==s[2][0] and s[0][2]=="X": #if X at opposite corners then place sides 
             if s[0][1]==0 and s[2][1]==0:
                 return random.choices((1,7))[0]
