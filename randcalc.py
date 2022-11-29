@@ -25,7 +25,7 @@ if n == "config":
     print("operation [+ : 0, - : 1, x : 2, / : 3]:", end=" ")
     op = int(input())
     cp = op
-    if op != -1 and config:
+    if op != 0 and config:
         op = op_list[op]
 if not config:
     n = int(n)
