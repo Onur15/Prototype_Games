@@ -22,7 +22,7 @@ if n == "config":
     if n2 == -1:    
         print("Type second num digits:", end=" ")
         m = int(input())
-    print("operation [+ : 0, - : 1, x : 2, / : 3]:", end=" ")
+    print("operation [0 : +, 1 : -, 2 : x, 3 : /]:", end=" ")
     op = int(input())
     cp = op
     if op != -1 and config:
