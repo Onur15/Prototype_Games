@@ -9,7 +9,7 @@ n = input("num digits: ")
 print()
 if n == "config":
     config = True
-    print("Type 0 for random:")
+    print("Type -1 for random:")
     print("Type first number:", end=" ")
     n1 = int(input())
     c1 = n1
@@ -25,20 +25,20 @@ if n == "config":
     print("operation [+ : 0, - : 1, x : 2, / : 3]:", end=" ")
     op = int(input())
     cp = op
-    if op != 0 and config:
+    if op != -1 and config:
         op = op_list[op]
 if not config:
     n = int(n)
     m = n
 while run:
-    if c1 == 0:
+    if c1 == -1:
         n1 = random.randint(10**(n-1), 10**n)
-    if c2 == 0:
+    if c2 == -1:
         n2 = random.randint(10**(m-1), 10**m)    
     
     div = True
     while div:
-        if cp == 0:
+        if cp == -1:
             op = random.choices(op_list, weights=[3,2,2,2])[0]
         if op == "/":
             for i in range(10):
