@@ -13,13 +13,13 @@ if n == "config":
     print("Type first number:", end=" ")
     n1 = int(input())
     c1 = n1
-    if n1 == 0:
+    if n1 == -1:
         print("Type first num digits:", end=" ")
         n = int(input())
     print("Type second number:", end=" ")
     n2 = int(input())
     c2 = n2
-    if n2 == 0:    
+    if n2 == -1:    
         print("Type second num digits:", end=" ")
         m = int(input())
     print("operation [+ : 0, - : 1, x : 2, / : 3]:", end=" ")
