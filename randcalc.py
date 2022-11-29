@@ -42,7 +42,7 @@ while run:
             op = random.choices(op_list, weights=[3,2,2,2])[0]
         if op == "/":
             for i in range(10):
-                if n1/n2 == round(n1/n2, 2):
+                if n1/n2 == round(n1/n2, 2) and n1/n2 != 1:
                     div = False
                     break
                 if c1 == -1:
