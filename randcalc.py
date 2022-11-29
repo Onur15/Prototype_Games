@@ -45,9 +45,9 @@ while run:
                 if n1/n2 == round(n1/n2, 2):
                     div = False
                     break
-                if c1 == 0:
+                if c1 == -1:
                     n1 = random.randint(10**(n-1), 10**n)
-                if c2 == 0:
+                if c2 == -1:
                     n2 = random.randint(10**(m-1), 10**m)
         else:
             div = False               
