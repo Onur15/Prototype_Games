@@ -1,7 +1,7 @@
 import random
 op_list = ["+", "-", "x", "/"]
 n1, n2, op = 0, 0, 0
-c1, c2 ,cp = 0, 0, 0
+c1, c2 ,cp = -1, -1, -1
 config = False
 run = True
 print("'config' for customise numbers.")
