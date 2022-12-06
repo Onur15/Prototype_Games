@@ -192,12 +192,10 @@ class Game:
             return True
     def print_board(self):
         print()
+        template = "{:>2} {:>2} {:>2}"
         for y in self.board:
-            for x in y:
-                if x == 0:
-                    print(" ", end= " ")
-                else:
-                    print(x, end= " ")
+            y = list(map(lambda x: x if x != 0 else "_", y))
+            print(template.format(*y))
             print()
         print()
 board = Game()
