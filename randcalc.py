@@ -3,7 +3,7 @@ from threading import Timer
 
 #Initialize
 def TimesUp():
-    print(f"\n\nTimes up! Try again.")
+    print(f"\n\nTime is up! Try again.")
     print("Answer:", eq.get(op_list.index(op)))
     print(f"Score: {correct}")
     global Times_up
@@ -21,7 +21,7 @@ n = input("num digits: ")
 #Configuration
 if n == "config":
     config = True
-    print("\nType -1 for random:")
+    print("\n(Type -1 for random)")
     print("Type first number:", end=" ")
     n1 = int(input())
     c1 = n1
