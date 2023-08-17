@@ -339,7 +339,7 @@ class Game():
         for move in self.avaliable_moves():
             self.board[move[1]][move[0]] = symbol
             score = self.find_best_score(not symbol)
-            print(move, score)
+            # print(move, score)
             self.board[move[1]][move[0]] = " "
             # Selecting moves that has highest score
             if score > best_score:
@@ -352,7 +352,7 @@ class Game():
             # Adds move to list if the move has same score 
             elif score == best_score:
                 best_moves.append( (move , score) )
-        print(best_moves)
+        # print(best_moves)
         # Selects one of the best moves
         return random.choice(best_moves)[0]
     
