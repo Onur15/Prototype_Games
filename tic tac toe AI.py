@@ -202,7 +202,7 @@ class Game():
                 pygame.display.update()
                 # Loop for player to press restart
                 while True:
-                     for event in pygame.event.get():
+                    for event in pygame.event.get():
                         self.handle_events(event)
                         pygame.display.update()
                         
@@ -437,25 +437,25 @@ class Game():
                     return self.player
         diag_list = [self.board[i][i] for i in range(3)]
         if diag_list.count(" ") == 1:
-                diag_list.remove(" ")
-                if len(set(diag_list)) == 1 and diag_list[0] == self.player:
-                    return self.player
+            diag_list.remove(" ")
+            if len(set(diag_list)) == 1 and diag_list[0] == self.player:
+                return self.player
         diag_list = [self.board[i][2-i] for i in range(3)]
         if diag_list.count(" ") == 1:
-                diag_list.remove(" ")
-                if len(set(diag_list)) == 1 and diag_list[0] == self.player:
-                    return self.player
+            diag_list.remove(" ")
+            if len(set(diag_list)) == 1 and diag_list[0] == self.player:
+                return self.player
         return None
     
-    def minimax(self, depth : int, maximizingPlayer : bool): # Minimax Algorithm
+    def minimax(self, depth : int, alpha, beta, maximizingPlayer : bool): # Minimax Algorithm with alpha-beta pruning
         if self.depth == 0 and random.randint(1, 5) == 1: # Level Easy: 20% random
             return random.choice((0, 1, -1))
         
         if self.check_winner(not self.player)[0]:
-            return 1
+            return depth + 1
         
         if self.check_winner(self.player)[0]:
-            return -1
+            return - depth - 1
         
         if len(self.avaliable_moves()) == 0:
             return 0
@@ -472,9 +472,12 @@ class Game():
             best_score = -float("inf")
             for move in self.avaliable_moves():
                 self.board[move[1]][move[0]] = maximizingPlayer
-                score = self.minimax(depth - 1, not maximizingPlayer)
+                score = self.minimax(depth - 1, alpha, beta, not maximizingPlayer)
                 self.board[move[1]][move[0]] = " "
                 best_score = max(best_score, score)
+                alpha = max(alpha, score)
+                if beta <= alpha:
+                    break
             return best_score
         
         # Opponent's perspective
@@ -482,9 +485,12 @@ class Game():
             best_score = float("inf")
             for move in self.avaliable_moves():
                 self.board[move[1]][move[0]] = maximizingPlayer
-                score = self.minimax(depth - 1, not maximizingPlayer)
+                score = self.minimax(depth - 1, alpha, beta, not maximizingPlayer)
                 self.board[move[1]][move[0]] = " "
                 best_score = min(best_score, score)
+                beta = min(beta, score)
+                if beta <= alpha:
+                    break
             return best_score
         
     def find_best_move(self, symbol : bool):
@@ -497,7 +503,7 @@ class Game():
         best_score = -float("inf")
         for move in self.avaliable_moves():
             self.board[move[1]][move[0]] = symbol
-            score = self.minimax(self.depth, not symbol)
+            score = self.minimax(self.depth, -float("inf"), float("inf"), not symbol)
             # print(move, score)
             self.board[move[1]][move[0]] = " "
             # Selecting moves that has highest score
@@ -526,3 +532,5 @@ class Game():
 if __name__ == "__main__":
     new_game = Game()
     new_game.play()
+
+
