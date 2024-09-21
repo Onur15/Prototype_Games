@@ -10,9 +10,9 @@ def reduce_angle(a:float)->float:
         a -= 180
     return a
 
-def calc_tension(position: pygame.math.Vector2, velocity:pygame.math.Vector2, lengthOfRope:float, mass:float, dt:float, k:float) -> pygame.math.Vector2:
+def calc_tension(position: pygame.math.Vector2, velocity:pygame.math.Vector2, lengthOfRope:float, mass:float, dt:float) -> pygame.math.Vector2:
     pos_mag = position.magnitude()
-    T_len = exp(log(position.dot(velocity)*mass*k) - log(pos_mag*dt)) + (pos_mag-lengthOfRope)*mass/dt**2
+    T_len = exp(log(position.dot(velocity)*mass) - log(pos_mag*dt)) + (pos_mag-lengthOfRope)*mass/dt**2
     T_dir = -position/pos_mag
     return T_len * T_dir
     
@@ -34,13 +34,12 @@ def main():
     radius = 4 # meter
     g = 9.8 # m/s^2
     mass = 1 #kg
-    dt = 5e-3 #ms
-    k = 1 
+    dt = 2e-3 #ms
     motion_type = "vertical" #vertical or horizontal
     weight = pygame.Vector2(0, -mass*g)
     
     #Initial values
-    w = -float((5*g/radius)**(1/2)-0.1) # rad/second
+    w = -float((5*g/radius)**(1/2)) # rad/second
     angle = -90
     pos = radius*pygame.Vector2(cos(pi*(1-angle/180)),sin(pi*(1-angle/180)))
     velocity = w*pygame.Vector2(-pos[1],pos[0])
@@ -48,21 +47,33 @@ def main():
     while True:        
         #Calculations
         pos_mag = pos.magnitude()
-        if pos_mag < radius or pos.dot(velocity) < 0:
+        if pos_mag < radius or pos.dot(velocity) < 0 or velocity.length() == 0:
             tension = pygame.Vector2(0,0)
-        if pos.dot(velocity) == 0:
+        if pos.dot(velocity) == 0 and velocity.length() != 0:
             tension = -mass * w**2 * pos
         if pos_mag >= radius and pos.dot(velocity) > 0:
-            tension = calc_tension(pos, velocity, radius, mass, dt, k)
+            tension = calc_tension(pos, velocity, radius, mass, dt)
         match motion_type:
             case "vertical":
-                force = tension + weight            
+                force = tension + weight
             case "horizontal":
                 force = tension
             case _: raise ValueError()
         acc = force / mass
         velocity += acc * dt
         pos += velocity * dt
+        
+        #Controls
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_BACKSPACE]:
+            break
+        if keys[pygame.K_w] and pos.magnitude() < radius*1.02:
+            if velocity.length() < 0.1:
+                sign_w = w/abs(w)
+                velocity = pygame.Vector2(sign_w*(1+dt),0)
+            velocity *= 1+5*dt/velocity.length()
+        if keys[pygame.K_s]:
+            velocity *= 1-5*dt/velocity.length()
         
         #Display
         DISPLAY.fill(white)
@@ -73,10 +84,11 @@ def main():
         Textt = Font.render(f"Tension magnitude: {round(tension.magnitude(), 1)} N", True, font_color)
         Textkinetic = Font.render(f"Kinetic Energy: {round(mass*velocity.magnitude_squared()/2,1)} J", True, red)
         Textmotion = Font.render(f"{motion_type.capitalize()} Motion", True, green)
+        Textmine = Font.render(f"Min. Energy For Circular Motion: {5/2*mass*g*radius} J", True, red)
         if motion_type == "vertical":
             pygame.draw.line(DISPLAY, black,(-50*pos.x+center[0], -50*pos.y+center[1]),(-50*pos.x+center[0], -50*pos.y+center[1]-5*weight.y), 5)
-            Textpotential = Font.render(f"Potential Energy: {round(mass*g*(pos.y+radius),1)} J", True, red)
-            Textenergy = Font.render(f"Total Energy: {round(mass*velocity.magnitude_squared()/2+mass*g*(pos.y+radius),1)} J", True, red)
+            Textpotential = Font.render(f"Potential Energy: {round(mass*g*abs(pos.y+radius),1)} J", True, red)
+            Textenergy = Font.render(f"Total Energy: {round(mass*velocity.magnitude_squared()/2+mass*g*abs(pos.y+radius),1)} J", True, red)
             DISPLAY.blit(Textpotential,(900,40))
             DISPLAY.blit(Textenergy,(900,70))
         DISPLAY.blit(Textx,(20,10))
@@ -85,6 +97,7 @@ def main():
         DISPLAY.blit(Textt,(20,100))
         DISPLAY.blit(Textmotion,(510,10))
         DISPLAY.blit(Textkinetic,(900,10))
+        DISPLAY.blit(Textmine,(20,690))
         pygame.draw.circle(DISPLAY, blue, (center[0], center[1]), 50*radius, 2)
         pygame.draw.line(DISPLAY, red, (center[0] , center[1]), (-50*pos.x+center[0], -50*pos.y+center[1]), 2)
         pygame.draw.circle(DISPLAY, blue, (-50*pos.x+center[0], -50*pos.y+center[1]), 10)
@@ -97,7 +110,8 @@ def main():
                 pygame.quit()
                 sys.exit()
             pygame.display.update()
-        
-main()
+    return
+while True:
+    main()
 
     
