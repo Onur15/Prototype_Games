@@ -6,7 +6,7 @@ class Game():
         self.table = []
         self.hit = {"0": 0, "1": 0}
         self.scores = {"0": 0, "1": 0}
-        self.settings = {"Display Orientation": "left", "Display On": True, "Show Hits": True, "Show Scores": True ,"Probabilities Respect To Player": 2}
+        self.settings = {"Display Orientation": "left", "Display On": True, "Show Hits": True, "Show Scores": True ,"Random Dice": True, "Probabilities Respect To Player": 2}
         
     def reset_table(self):
         tb = self.table
@@ -297,7 +297,8 @@ game.settings = {
     "Display Orientation": "left",
     "Display On": True,
     "Show Hits": True,
-    "Show Scores": True, 
+    "Show Scores": True,
+    "Random Dice": False,
     "Probabilities Respect To Player": 2
 }
 game.reset_table()
@@ -308,7 +309,10 @@ turn = int(input("Which player will start the game? (player 1 -> 1, player 2 -> 
 if not(turn in (1, -1)):
     raise ValueError("turn must be 1 or -1")
 while not(game.over):
-    dice = [randint(1,6),randint(1,6)]
+    if game.settings["Random Dice"]:
+        dice = [randint(1,6),randint(1,6)]
+    if not game.settings["Random Dice"]:
+        dice = list(map(int,input("Dice(Int(1-6), Int(1-6)): ").split(",")))
     print(f"Dice: {dice[0]},{dice[1]}")
     if dice[0] == dice[1]:
         dice.append(dice[0])
@@ -337,7 +341,7 @@ while not(game.over):
                     break
             continue
         while True:
-            inp = input("Move a piece (piece position, move distance, amount(if > 1)) ('pass' for skip round): ").strip().split(",")
+            inp = input("Move a piece (piece position(0-23), move distance, amount(if > 1)) ('pass' for skip round): ").strip().split(",")
             print()
             if inp == ["pass"]:
                 dice = []
