@@ -1,5 +1,5 @@
 from random import randint
-import pygame, sys, os, time
+import pygame, sys, os, time, math
 from pygame.locals import *
 class Game():
     def __init__(self):
@@ -12,26 +12,45 @@ class Game():
         draw_surf = pygame.Surface((desktop_width,sc_width*self.sc_ratio), pygame.SRCALPHA)
         draw_surf.fill("white")
         pygame.display.set_caption("Tavla")
+        width,height=draw_surf.get_width(),draw_surf.get_height()
+        self.btn_surf=pygame.Surface((width,height), pygame.SRCALPHA)
+        global left, pt, rad, bar_width, h, w, board_colors
+        board_colors=[(38,1,1),(80,30,30),(240,150,50)]
+        pt=width/100
+        bar_width=int(pt*16/3)
+        left=width/2-bar_width/2-(height-8*pt)*self.sc_ratio
+        w,h=width/2-bar_width/2-left,height-8*pt
+        rad=h*23/500
         self.turn = 1
+        self.flipped = False
         self.select = [-1,0]
         self.window = display
         self.display = draw_surf
         self.font = pygame.font.SysFont("serif", sc_width//50)
-        self.over = False
+        self.over = True
         self.waiting = False
         self.table = []
         self.hit = {"0": 0, "1": 0}
         self.scores = {"0": 0, "1": 0}
         self.collected = {"1": 0, "2": 0}
         self.settings = {
-            "Display Orientation": "left",
+            "Display Orientation": "right",
             "Show Scores": False,
-            "Show Moves": False,
+            "Show Moves": True,
             "Flip Board": True,
-            "Random Dice": [True,True],
-            "custom board": False,
-            "debug": False}
+            "probs": True,
+            "Double Dice": False,
+            "debug": False,
+            "custom board": False}  
     def reset_table(self):
+        self.turn=1
+        self.hit = {"0": 0, "1": 0}
+        self.scores = {"0": 0, "1": 0}
+        self.collected = {"1": 0, "2": 0}
+        self.table.clear()
+        self.flipped=False
+        self.waiting=False
+        self.select=[-1,0]
         tb = self.table
         self.scores = {"0": 208, "1": 208}
         for i in range(24):
@@ -45,37 +64,35 @@ class Game():
         self.display_table()
     def display_table(self,stones=True):
         global left, pt, rad, bar_width, h, w, board_colors
+        disp_orientation=self.settings["Display Orientation"]
+        if self.flipped: 
+            disp_orientation="right" if disp_orientation=="left" else "left"
         self.display.fill("white")
         p1c=[(245,70,70),(200,55,55)]
         p2c=[(225,225,225),(190,190,190)]
-        board_colors=[(38,1,1),(80,30,30),(240,150,50)]
         probs = list(self.calc_prob(3-self.turn).values())
+        if self.flipped: probs=probs[::-1]
         width=self.display.get_width()
         height=self.display.get_height()
-        pt=width/100
-        bar_width=int(pt*16/3)
         size=(height-8*pt)*self.sc_ratio
-        left=width/2-bar_width/2-size
         #Draw Board
         pygame.draw.rect(self.display,board_colors[2],(left,4*pt,2*size+bar_width+1,height-8*pt+1))
         pygame.draw.rect(self.display,board_colors[0],(left-int(bar_width/2),4*pt-int(bar_width/2),2*size+2*bar_width,height-8*pt+bar_width),int(bar_width/2))
         pygame.draw.line(self.display,board_colors[0],(width/2,4*pt),(width/2,height-4*pt),bar_width)
-        w,h=width/2-bar_width/2-left,height-8*pt
-        rad=h*23/500
         pygame.draw.rect(self.display,board_colors[1],(width/2-bar_width/3,4*pt+h*0.08,bar_width*2/3,h/3))
         pygame.draw.rect(self.display,board_colors[1],(width/2-bar_width/3,height-4*pt-h*0.08-h/3,bar_width*2/3,h/3))
         pygame.draw.line(self.display,board_colors[0],(width/2,4*pt+h*0.08+h/9),(width/2,5*pt+h*0.08+h/9),bar_width)
         pygame.draw.line(self.display,board_colors[0],(width/2,height-4*pt-h*0.08-h/3+h*2/9),(width/2,height-3*pt-h*0.08-h/3+h*2/9),bar_width)
         self.boxes=[0 for _ in range(26)]
         for j in range(6): #Create Boxes
-            if self.settings["Display Orientation"] == "left":
+            if disp_orientation == "left":
                 self.boxes[0]=pygame.Rect(left-w/6,4*pt,w/6,h/2)
                 self.boxes[25]=pygame.Rect(left-w/6,height-4*pt-h/2,w/6,h/2)
                 self.boxes[j+1]=pygame.Rect(left+w*j/6,4*pt,w/6,h/2)
                 self.boxes[j+7]=pygame.Rect(left+bar_width+w*(1+j/6),4*pt,w/6,h/2)
                 self.boxes[j+13]=pygame.Rect(left+bar_width+w*(11/6-j/6),height-4*pt-h/2,w/6,h/2)
                 self.boxes[j+19]=pygame.Rect(left+w*(5/6-j/6),height-4*pt-h/2,w/6,h/2)
-            if self.settings["Display Orientation"] == "right":
+            if disp_orientation == "right":
                 self.boxes[0]=pygame.Rect(left+bar_width+w*2,4*pt,w/6,h/2)
                 self.boxes[25]=pygame.Rect(left+bar_width+w*2,height-4*pt-h/2,w/6,h/2)
                 self.boxes[j+1]=pygame.Rect(left+bar_width+w*(11/6-j/6),4*pt,w/6,h/2)
@@ -110,23 +127,24 @@ class Game():
         def disp_prob(self,tx,coord): #Display Probabilities
             text=self.font.render(tx,True,"white")
             self.display.blit(text,coord)
-        sz1=pygame.font.Font.size(self.font,"%0")
-        sz2=pygame.font.Font.size(self.font,"%99")
-        sz3=pygame.font.Font.size(self.font,"%100")
-        szl=[sz1,sz2,sz3]
-        spc=(w-12*rad)/7+2*rad
-        if self.settings["Display Orientation"] == "left":
-            for j in range(6): 
-                disp_prob(self,probs[j],(left+(w-12*rad)/7+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,4*pt-szl[len(probs[j])-2][1]))
-                disp_prob(self,probs[j+6],(left+(w-12*rad)/7+w+bar_width+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,4*pt-szl[len(probs[j])-2][1]))
-                disp_prob(self,probs[23-j],(left+(w-12*rad)/7+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,height-4*pt))
-                disp_prob(self,probs[17-j],(left+(w-12*rad)/7+w+bar_width+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,height-4*pt))
-        if self.settings["Display Orientation"] == "right":
-            for j in range(6):
-                disp_prob(self,probs[11-j],(left+(w-12*rad)/7+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,4*pt-szl[len(probs[j])-2][1]))
-                disp_prob(self,probs[5-j],(left+(w-12*rad)/7+w+bar_width+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,4*pt-szl[len(probs[j])-2][1]))
-                disp_prob(self,probs[j+12],(left+(w-12*rad)/7+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,height-4*pt))
-                disp_prob(self,probs[j+18],(left+(w-12*rad)/7+w+bar_width+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,height-4*pt))
+        if self.settings["probs"]:
+            sz1=pygame.font.Font.size(self.font,"%0")
+            sz2=pygame.font.Font.size(self.font,"%99")
+            sz3=pygame.font.Font.size(self.font,"%100")
+            szl=[sz1,sz2,sz3]
+            spc=(w-12*rad)/7+2*rad
+            if disp_orientation == "left":
+                for j in range(6): 
+                    disp_prob(self,probs[j],(left+(w-12*rad)/7+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,4*pt-szl[len(probs[j])-2][1]))
+                    disp_prob(self,probs[j+6],(left+(w-12*rad)/7+w+bar_width+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,4*pt-szl[len(probs[j])-2][1]))
+                    disp_prob(self,probs[23-j],(left+(w-12*rad)/7+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,height-4*pt))
+                    disp_prob(self,probs[17-j],(left+(w-12*rad)/7+w+bar_width+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,height-4*pt))
+            if disp_orientation == "right":
+                for j in range(6):
+                    disp_prob(self,probs[11-j],(left+(w-12*rad)/7+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,4*pt-szl[len(probs[j])-2][1]))
+                    disp_prob(self,probs[5-j],(left+(w-12*rad)/7+w+bar_width+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,4*pt-szl[len(probs[j])-2][1]))
+                    disp_prob(self,probs[j+12],(left+(w-12*rad)/7+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,height-4*pt))
+                    disp_prob(self,probs[j+18],(left+(w-12*rad)/7+w+bar_width+(2*rad-szl[len(probs[j])-2][0])/2+j*spc,height-4*pt))
         if stones:
             for i in range(24): #Draw Stones
                 self.draw_stones(p1c,p2c,i)
@@ -134,25 +152,50 @@ class Game():
             disp_scores(self)
         step=h/85 #Draw Middle of the Board
         for j in range(self.hit["0"]):
-            pygame.draw.ellipse(self.display,p1c[0],(width/2-bar_width/3,height-3*pt-h*0.08-h/3+h*2/9-h/60+step*j,bar_width*2/3,h/20))
-            pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3,height-3*pt-h*0.08-h/3+h*2/9-h/60+step*j,bar_width*2/3,h/20),int(h/400))
-            pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3+bar_width/6,height-3*pt-h*0.08-h/3+h*2/9-h/240+step*j,bar_width/3,h/40))
+            if self.flipped:
+                pygame.draw.ellipse(self.display,p1c[0],(width/2-bar_width/3,4*pt+h*0.08-h/60+step*j,bar_width*2/3,h/20))
+                pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3,4*pt+h*0.08-h/60+step*j,bar_width*2/3,h/20),int(h/400))
+                pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3+bar_width/6,4*pt+h*0.08-h/240+step*j,bar_width/3,h/40))
+            else:
+                pygame.draw.ellipse(self.display,p1c[0],(width/2-bar_width/3,height-3*pt-h*0.08-h/3+h*2/9-h/60+step*j,bar_width*2/3,h/20))
+                pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3,height-3*pt-h*0.08-h/3+h*2/9-h/60+step*j,bar_width*2/3,h/20),int(h/400))
+                pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3+bar_width/6,height-3*pt-h*0.08-h/3+h*2/9-h/240+step*j,bar_width/3,h/40))
         for j in range(self.hit["1"]):
-            pygame.draw.ellipse(self.display,p2c[0],(width/2-bar_width/3,4*pt+h*0.08-h/60+step*j,bar_width*2/3,h/20))
-            pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3,4*pt+h*0.08-h/60+step*j,bar_width*2/3,h/20),int(h/400))
-            pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3+bar_width/6,4*pt+h*0.08-h/240+step*j,bar_width/3,h/40))
+            if self.flipped:
+                pygame.draw.ellipse(self.display,p2c[0],(width/2-bar_width/3,height-3*pt-h*0.08-h/3+h*2/9-h/60+step*j,bar_width*2/3,h/20))
+                pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3,height-3*pt-h*0.08-h/3+h*2/9-h/60+step*j,bar_width*2/3,h/20),int(h/400))
+                pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3+bar_width/6,height-3*pt-h*0.08-h/3+h*2/9-h/240+step*j,bar_width/3,h/40))
+            else:
+                pygame.draw.ellipse(self.display,p2c[0],(width/2-bar_width/3,4*pt+h*0.08-h/60+step*j,bar_width*2/3,h/20))
+                pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3,4*pt+h*0.08-h/60+step*j,bar_width*2/3,h/20),int(h/400))
+                pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3+bar_width/6,4*pt+h*0.08-h/240+step*j,bar_width/3,h/40))
         for j in range(self.collected["1"]):
-            pygame.draw.ellipse(self.display,p1c[0],(width/2-bar_width/3,height-4*pt-h*0.08-h/3-h/60+step*j,bar_width*2/3,h/20))
-            pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3,height-4*pt-h*0.08-h/3-h/60+step*j,bar_width*2/3,h/20),int(h/400))
-            pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3+bar_width/6,height-4*pt-h*0.08-h/3-h/240+step*j,bar_width/3,h/40))
+            if self.flipped:
+                pygame.draw.ellipse(self.display,p1c[0],(width/2-bar_width/3,5*pt+h*0.08+h/9-h/60+step*j,bar_width*2/3,h/20))
+                pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3,5*pt+h*0.08+h/9-h/60+step*j,bar_width*2/3,h/20),int(h/400))
+                pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3+bar_width/6,5*pt+h*0.08+h/9-h/240+step*j,bar_width/3,h/40))
+            else:
+                pygame.draw.ellipse(self.display,p1c[0],(width/2-bar_width/3,height-4*pt-h*0.08-h/3-h/60+step*j,bar_width*2/3,h/20))
+                pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3,height-4*pt-h*0.08-h/3-h/60+step*j,bar_width*2/3,h/20),int(h/400))
+                pygame.draw.ellipse(self.display,p1c[1],(width/2-bar_width/3+bar_width/6,height-4*pt-h*0.08-h/3-h/240+step*j,bar_width/3,h/40))
         for j in range(self.collected["2"]):
-            pygame.draw.ellipse(self.display,p2c[0],(width/2-bar_width/3,5*pt+h*0.08+h/9-h/60+step*j,bar_width*2/3,h/20))
-            pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3,5*pt+h*0.08+h/9-h/60+step*j,bar_width*2/3,h/20),int(h/400))
-            pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3+bar_width/6,5*pt+h*0.08+h/9-h/240+step*j,bar_width/3,h/40))
+            if self.flipped:
+                pygame.draw.ellipse(self.display,p2c[0],(width/2-bar_width/3,height-4*pt-h*0.08-h/3-h/60+step*j,bar_width*2/3,h/20))
+                pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3,height-4*pt-h*0.08-h/3-h/60+step*j,bar_width*2/3,h/20),int(h/400))
+                pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3+bar_width/6,height-4*pt-h*0.08-h/3-h/240+step*j,bar_width/3,h/40))
+            else:
+                pygame.draw.ellipse(self.display,p2c[0],(width/2-bar_width/3,5*pt+h*0.08+h/9-h/60+step*j,bar_width*2/3,h/20))
+                pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3,5*pt+h*0.08+h/9-h/60+step*j,bar_width*2/3,h/20),int(h/400))
+                pygame.draw.ellipse(self.display,p2c[1],(width/2-bar_width/3+bar_width/6,5*pt+h*0.08+h/9-h/240+step*j,bar_width/3,h/40))
         self.window.blit(self.display,(0,0))
+        self.button_screen()
     def draw_stones(self,p1c,p2c,i,count=-1):
         tb = self.table
-        if self.settings["Display Orientation"] == "right": tb=self.table[0:12][::-1]+self.table[12:24][::-1]
+        disp_orientation=self.settings["Display Orientation"]
+        if self.flipped: 
+            disp_orientation="right" if disp_orientation=="left" else "left"
+        if disp_orientation == "right": tb=self.table[0:12][::-1]+self.table[12:24][::-1]
+        if self.flipped: tb=tb[::-1]
         pos = tb[i]
         if pos["player"]==1: c0,c1=p1c[0],p1c[1]
         if pos["player"]==2: c0,c1=p2c[0],p2c[1]
@@ -246,6 +289,7 @@ class Game():
                 self.move_dp=False
                 self.draw_dice()
                 self.window.blit(self.display,(0,0))
+                self.button_screen()
                 pygame.display.update()
                 if self.scores[str(player-1)] == 375 or self.collected[str(player)] == 15:
                     self.over = True
@@ -263,6 +307,7 @@ class Game():
                 self.move_dp=False
                 self.draw_dice()
                 self.window.blit(self.display,(0,0))
+                self.button_screen()
                 pygame.display.update()
                 if self.scores[str(player-1)] == 375 or self.collected[str(player)] == 15:
                     self.over = True
@@ -306,6 +351,7 @@ class Game():
             self.move_dp=False
             self.draw_dice()
             self.window.blit(self.display,(0,0))
+            self.button_screen()
             pygame.display.update()
         else: return -1
     def place(self, player, x):
@@ -339,6 +385,7 @@ class Game():
         self.move_dp=False
         self.draw_dice()
         self.window.blit(self.display,(0,0))
+        self.button_screen()
         pygame.display.update()
     def calc_prob(self, player):
         tb = self.table
@@ -438,6 +485,7 @@ class Game():
             for n in range(len(self.dice2)):
                 n=self.dice2[0]*(n+1)
                 point=p+(3-2*self.turn)*n
+                if self.flipped: point+=23-2*p
                 if not(point in range(24)):
                     point=-1 if point<0 else 24
                     check=self.check_all_in(self.turn)
@@ -445,16 +493,19 @@ class Game():
                     if check[1]>abs(p-point):
                         if self.turn==1 and n!=24-p or self.turn==2 and n!=p+1:
                             continue
-                    moveable_slots.add(point)
+                    if self.flipped: moveable_slots.add(23-point)
+                    else: moveable_slots.add(point)
                 elif tb[point]["player"]!=self.turn and tb[point]["count"]>1:
                     break
-                moveable_slots.add(point)
+                if self.flipped: moveable_slots.add(23-point)
+                else: moveable_slots.add(point)
         else:
             for n in range(len(self.dice2)+1):
                 if n<len(self.dice2): n=self.dice2[n]
                 elif len(moveable_slots)!=0 and len(self.dice2)==2: n=sum(self.dice2)
                 else: break
                 point=p+(3-2*self.turn)*n
+                if self.flipped: point+=23-2*p
                 if not(point in range(24)):
                     point=-1 if point<0 else 24
                     check=self.check_all_in(self.turn)
@@ -462,24 +513,26 @@ class Game():
                     if check[1]>abs(p-point):
                         if self.turn==1 and n!=24-p or self.turn==2 and n!=p+1:
                             continue
-                    moveable_slots.add(point)
+                    if self.flipped: moveable_slots.add(23-point)
+                    else: moveable_slots.add(point)
                 elif tb[point]["player"]!=self.turn and tb[point]["count"]>1:
                     continue
-                moveable_slots.add(point)
+                if self.flipped: moveable_slots.add(23-point)
+                else: moveable_slots.add(point)
         if len(moveable_slots)==0: return -1
         else: return moveable_slots
     def draw_dice(self):
         if self.dice2==[]:
             self.waiting=False
-            self.turn = 3-self.turn
             if self.settings["Flip Board"]:
                 self.display_table()
                 self.move_dp=False
                 self.window.blit(self.display,(0,0))
+                self.button_screen()
                 pygame.display.update()
                 time.sleep(0.5)
-                if self.settings["Display Orientation"]=="left": self.settings["Display Orientation"]="right"
-                else: self.settings["Display Orientation"]="left"
+                self.flipped=not(self.flipped)
+            self.turn = 3-self.turn
         else:
             sc_width = self.display.get_width()
             ft = pygame.font.SysFont("serif", sc_width//40)
@@ -493,19 +546,106 @@ class Game():
     def random_dice(self):
         if not self.waiting:
             global dice
-            if self.settings["Random Dice"][0]:
-                dice=[randint(1,6),randint(1,6)]
-                if self.settings["Random Dice"][1]:
-                    r=randint(1,6)
-                    dice=[r,r]
-                self.dice2=[dice[0],dice[1]]
-                if dice[0]==dice[1]:
-                    self.dice2=[dice[0] for _ in range(4)]
-                self.waiting=True
-                self.display_table()
-                self.move_dp=False
-                self.draw_dice()
-                self.window.blit(self.display, (0,0))
+            dice=[randint(1,6),randint(1,6)]
+            if self.settings["Double Dice"]:
+                r=randint(1,6)
+                dice=[r,r]
+            self.dice2=[dice[0],dice[1]]
+            if dice[0]==dice[1]:
+                self.dice2=[dice[0] for _ in range(4)]
+            self.waiting=True
+            self.display_table()
+            self.move_dp=False
+            self.draw_dice()
+            self.window.blit(self.display, (0,0))
+            self.button_screen()
+    def settings_events(self):
+        if not self.over:
+            self.display_table()
+            self.draw_dice()
+            self.button_screen((215,85,45,200),1)
+            self.window.blit(self.display,(0,0))
+        height=self.display.get_height()
+        width=self.display.get_width()
+        bg_rect=pygame.Rect((width-bar_width-w)/2,height/2-h/4,w+bar_width,h/2)
+        close_btn=pygame.Rect(bg_rect.right-bg_rect.width/12,bg_rect.top+bg_rect.width/60,bg_rect.width/15,bg_rect.width/15)
+        center=close_btn.center; width=close_btn.width
+        pygame.draw.rect(self.btn_surf,(164,151,151,240),bg_rect,0,int(w/40))
+        self.draw_settings()
+        pygame.draw.circle(self.btn_surf,"black",center,width/2,int(width/10))
+        pygame.draw.line(self.btn_surf,"white",(center[0]-width/4,center[1]-width/4),(center[0]+width/4,center[1]+width/4),int(bg_rect.width/150))
+        pygame.draw.line(self.btn_surf,"white",(center[0]-width/4,center[1]+width/4),(center[0]+width/4,center[1]-width/4),int(bg_rect.width/150))
+        self.window.blit(self.btn_surf,(0,0))
+        settings=True
+        while settings:
+            pygame.time.delay(10)
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type==MOUSEBUTTONDOWN:
+                    pos=pygame.mouse.get_pos()
+                    if close_btn.collidepoint(pos):
+                        if not self.over:
+                            self.display_table()
+                            self.draw_dice()
+                            self.button_screen((215,85,45,200),1)
+                        self.window.blit(self.display,(0,0))
+                        pygame.draw.rect(self.btn_surf,(164,151,151,240),bg_rect,0,int(w/40))
+                        self.draw_settings()
+                        pygame.draw.circle(self.btn_surf,"black",center,width/2,int(width/10))
+                        pygame.draw.circle(self.btn_surf,(255,30,30),center,width/2-int(width/10))
+                        pygame.draw.line(self.btn_surf,"white",(center[0]-width/4,center[1]-width/4),(center[0]+width/4,center[1]+width/4),int(bg_rect.width/150))
+                        pygame.draw.line(self.btn_surf,"white",(center[0]-width/4,center[1]+width/4),(center[0]+width/4,center[1]-width/4),int(bg_rect.width/150))
+                        self.window.blit(self.btn_surf,(0,0))
+                        settings=False
+                        pygame.display.update()
+                        time.sleep(0.2)
+                        if not self.over:
+                            self.display_table()
+                            self.draw_dice()
+                            self.button_screen((215,85,45,200),1)
+                        self.window.blit(self.display,(0,0))
+                        pygame.draw.rect(self.btn_surf,(164,151,151,240),bg_rect,0,int(w/40))
+                        self.draw_settings()
+                        pygame.draw.circle(self.btn_surf,"black",center,width/2,int(width/10))
+                        pygame.draw.line(self.btn_surf,"white",(center[0]-width/4,center[1]-width/4),(center[0]+width/4,center[1]+width/4),int(bg_rect.width/150))
+                        pygame.draw.line(self.btn_surf,"white",(center[0]-width/4,center[1]+width/4),(center[0]+width/4,center[1]-width/4),int(bg_rect.width/150))
+                        self.window.blit(self.btn_surf,(0,0))
+                        pygame.display.update()
+                        time.sleep(0.1)
+                        if not self.over:
+                            self.display_table()
+                            self.draw_dice()
+                            self.window.blit(self.display,(0,0))
+                            self.button_screen()
+                            self.window.blit(self.btn_surf,(0,0))
+                        else:
+                            self.btn_surf.fill("white")
+                            self.window.blit(self.btn_surf,(0,0))
+                            self.disp_main()
+                        pygame.display.update()
+                        return
+                    if self.setting_buttons[0].collidepoint(pos):
+                        if self.settings["Display Orientation"]=="left": self.settings["Display Orientation"]="right"
+                        else: self.settings["Display Orientation"]="left"
+                    if self.setting_buttons[1].collidepoint(pos): self.settings["Show Scores"]=not(self.settings["Show Scores"])
+                    if self.setting_buttons[2].collidepoint(pos): self.settings["Show Moves"]=not(self.settings["Show Moves"])
+                    if self.setting_buttons[3].collidepoint(pos): self.settings["Flip Board"]=not(self.settings["Flip Board"])
+                    if self.setting_buttons[4].collidepoint(pos): self.settings["debug"]=not(self.settings["debug"])
+                    if self.setting_buttons[5].collidepoint(pos): self.settings["probs"]=not(self.settings["probs"])
+                    if not self.over:
+                        self.display_table()
+                        self.draw_dice()
+                        self.button_screen((215,85,45,200),1)
+                    self.window.blit(self.display,(0,0))
+                    pygame.draw.rect(self.btn_surf,(164,151,151,240),bg_rect,0,int(w/40))
+                    self.draw_settings()
+                    pygame.draw.circle(self.btn_surf,"black",center,width/2,int(width/10))
+                    pygame.draw.line(self.btn_surf,"white",(center[0]-width/4,center[1]-width/4),(center[0]+width/4,center[1]+width/4),int(bg_rect.width/150))
+                    pygame.draw.line(self.btn_surf,"white",(center[0]-width/4,center[1]+width/4),(center[0]+width/4,center[1]-width/4),int(bg_rect.width/150))
+                    self.window.blit(self.btn_surf,(0,0))
+                pygame.display.update()
     def handle_events(self,event):
         self.random_dice()
         p1c=[(245,70,70),(200,55,55)]
@@ -514,9 +654,26 @@ class Game():
         p2c_sel=[(250,250,250,220),(120,210,210,220)]
         if event.type==MOUSEBUTTONDOWN:
             pos = pygame.mouse.get_pos()
+            if self.main_btn.collidepoint(pos):
+                self.over=True
+                self.button_screen((215,85,45,200),0)
+                pygame.display.update()
+                time.sleep(0.1)
+                self.display_table()
+                self.draw_dice()
+                self.window.blit(self.display,(0,0))
+                self.button_screen()
+                pygame.display.update()
+                time.sleep(0.3)
+                self.display.fill("white")
+                self.window.blit(self.display,(0,0))
+                self.main_menu()
+            if self.settings_btn.collidepoint(pos):
+                self.settings_events()
             for j in range(26): #0,25
                 if self.boxes[j].collidepoint(pos):
                     j=j-1 #-1,24
+                    if self.flipped: j=23-j
                     if self.hit[str(self.turn-1)]!=0 and event.button==3:
                         if self.turn==1: j=j+1
                         if self.turn==2: j=24-j
@@ -532,10 +689,14 @@ class Game():
                             self.draw_dice()
                             self.move_dp=False
                             self.window.blit(self.display,(0,0))
+                            self.button_screen()
                             break
                         if self.table[j]["player"]==self.turn and event.button==1:
                             k=j
-                            if self.settings["Display Orientation"] == "right": 
+                            disp_orientation=self.settings["Display Orientation"]
+                            if self.flipped: 
+                                disp_orientation="right" if disp_orientation=="left" else "left"
+                            if disp_orientation == "right": 
                                 if j<12: k=11-j
                                 if j>=12: k=35-j
                             if self.select[0]!=j: 
@@ -543,12 +704,14 @@ class Game():
                                 self.select[1]=0
                             self.select[0]=j
                             self.select[1]+=1
-                            self.display_table(False)
+                            self.display_table(stones=False)
                             self.move_dp=False
                             for i in range(24): self.draw_stones(p1c,p2c,i)
+                            if self.flipped: k=23-k
                             self.draw_stones(p1c_sel,p2c_sel,k,self.select[1])
                             self.draw_dice()
                             self.window.blit(self.display,(0,0))
+                            self.button_screen()
                             break
                     if event.button==3 and self.select[0]!=-1:
                         for i in range(self.select[1]):
@@ -567,20 +730,21 @@ class Game():
                 pygame.display.update()
                 time.sleep(1.5)
                 self.dice2=[]
-                self.turn = 3-self.turn
                 if self.settings["Flip Board"]:
                     self.display_table()
                     self.move_dp=False
                     self.window.blit(self.display,(0,0))
+                    self.button_screen()
                     pygame.display.update()
                     time.sleep(0.5)
-                    if self.settings["Display Orientation"]=="left": self.settings["Display Orientation"]="right"
-                    else: self.settings["Display Orientation"]="left"
+                    self.flipped=not(self.flipped)
+                self.turn = 3-self.turn
                 self.waiting = False
                 self.move_dp=False
                 self.display_table()
                 self.random_dice()
                 self.window.blit(self.display,(0,0))
+                self.button_screen()
     def check_stuck(self):
         if self.hit[str(self.turn-1)]!=0: return False    
         tb = self.table
@@ -596,22 +760,24 @@ class Game():
                 for el in slots: moveable_slots.add(el)
         if len(moveable_slots)==0: return True
         else: return False
-    def table_preset1(self):
+    def table_preset(self):
         tb = self.table
         self.scores = {"0": 0, "1": 0}
         for i in range(24):
             tb.append({"player": 0,"count": 0})
-        tb[0]={"player": 1,"count": 2}
-        tb[6]={"player": 2,"count": 2}
-        # for i in range(6):
-        #     tb[i]={"player":2, "count":2+i%2}
-        #     tb[23-i]={"player":1, "count":2+i%2}
-        #     self.scores["1"]+=(24-i)*tb[i]["count"]
-        #     self.scores["0"]+=(24-i)*tb[i]["count"]
+        # self.hit["0"]=1
+        # tb[0]={"player": 1,"count": 2}
+        # tb[6]={"player": 2,"count": 2}
+        for i in range(6):
+            tb[i]={"player":2, "count":2+i%2}
+            tb[23-i]={"player":1, "count":2+i%2}
+        for i in range(24):
+            self.scores["1"]+=(24-i)*tb[i]["count"]
+            self.scores["0"]+=(24-i)*tb[i]["count"]
         self.display_table()
     def play(self):
         if self.settings["custom board"]:
-            self.table_preset1()
+            self.table_preset()
         else:
             self.reset_table()
         global start
@@ -626,6 +792,7 @@ class Game():
                 pygame.display.update()
         self.waiting=False
         self.move_dp=False
+        self.over=False
         while not(self.over):
             pygame.time.delay(10)
             for event in pygame.event.get():
@@ -634,38 +801,66 @@ class Game():
                     sys.exit()
                 self.handle_events(event)
                 if self.settings["Show Moves"]:
-                    moves=self.moveable_slots(self.select[0])
-                    if self.move_dp==False and moves!=-1 and self.select[0]!=-1:
+                    if self.hit[str(self.turn-1)]==0:
+                        sel=self.select[0]
+                    elif self.turn==1: sel=-1
+                    elif self.turn==2: sel=24
+                    if self.flipped: sel=23-sel
+                    moves=self.moveable_slots(sel)
+                    if self.move_dp==False and moves!=-1 and (self.select[0]!=-1 or self.hit[str(self.turn-1)]!=0):
                         moves=list(moves)
                         for j in moves:
-                            dist=abs(self.select[0]-j)
-                            if not(dist in self.dice2):
+                            dist=abs(sel-j)
+                            if self.check_all_in(self.turn)==-1 or j in range(24):
+                                if not(dist in self.dice2):
+                                    if self.hit[str(self.turn-1)]<2:
+                                        pygame.draw.rect(self.display,(255,55,160,140),self.boxes[j+1])
+                                    else: continue
+                                else: pygame.draw.rect(self.display,(120,210,210,140),self.boxes[j+1])
+                            elif dist in self.dice2:
+                                pygame.draw.rect(self.display,(120,210,210,140),self.boxes[j+1])
+                            elif dist==sum(self.dice2):
                                 pygame.draw.rect(self.display,(255,55,160,140),self.boxes[j+1])
-                            else: pygame.draw.rect(self.display,(120,210,210,140),self.boxes[j+1])
+                            elif self.turn==1 and self.check_all_in(self.turn)[1]==24-self.select[0] and max(self.dice2)>self.check_all_in(self.turn)[1]:
+                                pygame.draw.rect(self.display,(120,210,210,140),self.boxes[j+1])
+                            elif self.turn==2 and self.check_all_in(self.turn)[1]==1+self.select[0] and max(self.dice2)>self.check_all_in(self.turn)[1]:
+                                pygame.draw.rect(self.display,(120,210,210,140),self.boxes[j+1])
                         self.window.blit(self.display,(0,0))
-                        self.move_dp=True
+                        self.button_screen()
+                        self.move_dp=True                   
                 pygame.display.update()
                 if self.dice2!=[] and self.check_stuck():
                     time.sleep(1)
-                    self.turn = 3-self.turn
                     self.waiting = False
                     if self.settings["Flip Board"]:
                         self.display_table()
                         self.draw_dice()
                         self.move_dp=False
                         self.window.blit(self.display,(0,0))
+                        self.button_screen()
                         pygame.display.update()
-                        if self.settings["Display Orientation"]=="left": self.settings["Display Orientation"]="right"
-                        else: self.settings["Display Orientation"]="left"
+                        self.flipped=not(self.flipped)
+                    self.turn = 3-self.turn
     def starting_screen(self,event):
+        def reset_screen(self):
+            self.display_table()
+            pygame.draw.rect(start_surf,(164,151,151,240),bg,0,int(w/40))
+            pygame.draw.rect(start_surf,"white",btn1,0,int(pad/2))
+            pygame.draw.rect(start_surf,"white",btn2,0,int(pad/2))
+            pygame.draw.rect(start_surf,"white",btnd,0,int(pad/2))
+            start_surf.blit(txtitle,(bg.centerx-txtitle.get_width()/2,bg.top+pad))
+            start_surf.blit(tx1,(btn1.left+pad,btn1.top+pad))
+            start_surf.blit(tx2,(btn2.left+pad,btn2.top+pad))
+            start_surf.blit(txd,(btnd.left+txd.get_width()/20,btnd.top+txd.get_height()/20))
         global start
         width=self.display.get_width()
         height=self.display.get_height()
         start_surf=pygame.Surface((width,height), pygame.SRCALPHA)
         bg=pygame.Rect(width/2-w*2/5,4*pt+h/3,w*4/5,h/3)
+        txtitle=self.font.render("Who Will Start?",True,"black")
         tx1=self.font.render("Player 1",True,"black")
         tx2=self.font.render("Player 2",True,"black")
-        txd=self.font.render("Zar At",True,"black")
+        txd=self.font.render("Random",True,"black")
         btn1=pygame.Surface.get_rect(tx1)
         btn2=pygame.Surface.get_rect(tx2)
         btnd=pygame.Rect(bg.center[0]-txd.get_width()*11/20,bg.center[1]-txd.get_height()*8/5,txd.get_width()*11/10,txd.get_height()*11/10)
@@ -676,9 +871,10 @@ class Game():
         btn2.left=bg.left+bg.width/2+x*3/5-pad; btn2.top=bg.top+bg.height*7/10-y-pad
         btn2.width+=2*pad; btn2.height+=2*pad;
         select_color=(215,85,45,200)
-        col=pygame.Color(board_colors[0])
-        col.a=220
-        if not start: pygame.draw.rect(start_surf,col,bg,0,int(w/40)); start=True
+        if not start: 
+            pygame.draw.rect(start_surf,(164,151,151,240),bg,0,int(w/40))
+            start_surf.blit(txtitle,(bg.centerx-txtitle.get_width()/2,bg.top+pad))
+            start=True
         pygame.draw.rect(start_surf,"white",btn1,0,int(pad/2))
         pygame.draw.rect(start_surf,"white",btn2,0,int(pad/2))
         pygame.draw.rect(start_surf,"white",btnd,0,int(pad/2))
@@ -691,7 +887,11 @@ class Game():
                 pygame.draw.rect(start_surf,select_color,btn1,0,int(pad/2))
                 self.window.blit(start_surf,(0,0))
                 pygame.display.update()
-                time.sleep(0.5)
+                time.sleep(0.1)
+                reset_screen(self)
+                self.window.blit(start_surf,(0,0))
+                pygame.display.update()
+                time.sleep(0.3)
                 self.turn=1
                 self.display_table()
                 self.waiting=True
@@ -699,38 +899,199 @@ class Game():
                 pygame.draw.rect(start_surf,select_color,btn2,0,int(pad/2))
                 self.window.blit(start_surf,(0,0))
                 pygame.display.update()
-                time.sleep(0.5)
+                time.sleep(0.1)
+                reset_screen(self)
+                self.window.blit(start_surf,(0,0))
+                pygame.display.update()
+                time.sleep(0.3)
                 self.turn=2
+                self.flipped=True
                 self.display_table()
                 self.waiting=True
             if btnd.collidepoint(pos):
                 st_dice=[randint(1,6),randint(1,6)]
                 ft = pygame.font.SysFont("serif", width//40)
-                txd1=ft.render(str(st_dice[0]),True,"white")
-                txd2=ft.render(str(st_dice[1]),True,"white")
+                txd1=ft.render(str(st_dice[0]),True,"black")
+                txd2=ft.render(str(st_dice[1]),True,"black")
                 start_surf.blit(txd1,(btn1.left+(btn1.width-txd1.get_width())/2,btn1.top-txd1.get_height()*11/10))
                 start_surf.blit(txd2,(btn2.left+(btn2.width-txd2.get_width())/2,btn2.top-txd2.get_height()*11/10))
                 pygame.draw.rect(start_surf,select_color,btnd,0,int(pad/2))
                 self.window.blit(start_surf,(0,0))
                 pygame.display.update()
-                time.sleep(1)
+                time.sleep(0.1)
+                reset_screen(self)
+                start_surf.blit(txd1,(btn1.left+(btn1.width-txd1.get_width())/2,btn1.top-txd1.get_height()*11/10))
+                start_surf.blit(txd2,(btn2.left+(btn2.width-txd2.get_width())/2,btn2.top-txd2.get_height()*11/10))
+                self.window.blit(start_surf,(0,0))
+                pygame.display.update()
+                time.sleep(0.9)
                 if st_dice[0]==st_dice[1]:
                     self.display_table()
                     start=False
                     return -1
-                self.turn= 1 if st_dice[0]>st_dice[1] else 2
+                self.turn=1 if st_dice[0]>st_dice[1] else 2
+                if self.turn==2: self.flipped=True
                 self.display_table()
                 self.waiting=True
         self.window.blit(start_surf,(0,0))
-game = Game()
-game.settings = {
-    "Display Orientation": "left",
-    "Show Scores": True,
-    "Show Moves": True,
-    "Flip Board": True,
-    "Random Dice": [True,False],
-    "debug": False,
-    "custom board": False,
-}
-game.play()
-
+    def button_screen(self,col=0,button=-1):
+        width=self.display.get_width()
+        height=self.display.get_height()
+        self.btn_surf=pygame.Surface((width,height), pygame.SRCALPHA)
+        settings_btn=pygame.Rect(width-(width-w)/8,height/2-h/2,3*pt,3*pt)
+        self.settings_btn=settings_btn
+        main_text=self.font.render("Main Menu",True,"black")
+        main_btn=main_text.get_rect(bottomleft=(width-main_text.get_width()-4*pt,height-5*pt+bar_width/2))
+        main_btn.width+=pt; main_btn.height+=pt
+        self.main_btn=main_btn
+        if col!=0 and button==0:
+            pygame.draw.rect(self.btn_surf,col,main_btn)
+        if col!=0 and button==1:
+            pygame.draw.rect(self.btn_surf,col,(settings_btn.left+settings_btn.width/10,settings_btn.top+settings_btn.width/10,settings_btn.width*0.9,settings_btn.width*0.9))
+        center=settings_btn.center
+        r=settings_btn.width/4
+        icon_rect=pygame.Rect(center[0]-r,center[1]-r,r,r)
+        self.btn_surf.blit(main_text,(main_btn.left+pt/2,main_btn.top+pt/2))
+        pygame.draw.rect(self.btn_surf,"black",main_btn,2)
+        pygame.draw.rect(self.btn_surf,"black",settings_btn,int(settings_btn.width/10))
+        pygame.draw.circle(self.btn_surf,"black",center,r,int(r/2))
+        tl=(center[0]-r/4,icon_rect.top-r/3)
+        tr=(center[0]+r/4,icon_rect.top-r/3)
+        bl=(center[0]-r/4,center[1]-r/2)
+        br=(center[0]+r/4,center[1]-r/2)
+        n,phi=8,math.pi/8
+        def rotate(coord,center,angle):
+            z=complex(coord[0]-center[0],coord[1]-center[1])*complex(math.cos(angle),math.sin(angle))
+            return (z.real+center[0],z.imag+center[1])
+        for i in range(n):
+            x=i*2*math.pi/n+phi
+            pygame.draw.polygon(self.btn_surf,"black",[rotate(tl,center,x),rotate(bl,center,x),rotate(br,center,x),rotate(tr,center,x)])
+        self.window.blit(self.btn_surf,(0,0))
+    def draw_settings(self):
+        global pt, bar_width, h, w
+        sc_size=self.display.get_size()
+        topleft=[(sc_size[0]-bar_width-w)/2,sc_size[1]/2-h/4]
+        bottomright=[(sc_size[0]+bar_width+w)/2,sc_size[1]/2+h/4]
+        font = pygame.font.SysFont("serif", sc_size[0]//65)
+        title=pygame.font.SysFont("serif",sc_size[0]//45).render("Settings",True,"black")
+        tx1=font.render("Display Orientation:",True,"black")
+        tx2=font.render("Show Scores:",True,"black")
+        tx3=font.render("Show Moveable Points:",True,"black")
+        tx4=font.render("Flip Board:",True,"black")
+        tx5=font.render("Show Hitboxes:",True,"black")
+        tx6=font.render("Show Probabilities:",True,"black")
+        # tx7=font.render("Settings 7:",True,"black")
+        height=tx1.get_height()
+        mid=topleft[0]+2*pt+tx3.get_width()
+        wd_height=bottomright[1]-topleft[1]
+        sp=(wd_height-(7*height+6*pt))/2
+        self.setting_buttons=[0 for _ in range(7)]
+        for j in range(1,7): self.setting_buttons[j]=pygame.Rect(mid+pt,topleft[1]+sp+j*(height+pt),height,height)
+        pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[1],int(height/10))
+        pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[2],int(height/10))
+        pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[3],int(height/10))
+        pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[4],int(height/10))
+        pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[5],int(height/10))
+        # pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[6],int(height/10))
+        if self.settings["Display Orientation"]=="left":
+            tx=font.render("Left",True,"black")
+            self.btn_surf.blit(tx,(mid+pt,topleft[1]+sp))
+            self.setting_buttons[0]=pygame.Rect(mid+pt,topleft[1]+sp,tx.get_width(),tx.get_height())
+        if self.settings["Display Orientation"]=="right":
+            tx=font.render("Right",True,"black")
+            self.btn_surf.blit(tx,(mid+pt,topleft[1]+sp))
+            self.setting_buttons[0]=pygame.Rect(mid+pt,topleft[1]+sp,tx.get_width(),tx.get_height())
+        if self.settings["Show Scores"]:
+            pygame.draw.lines(self.btn_surf,(35,225,25),False,[(mid+pt+height*0.2,topleft[1]+sp+height+pt+height/2),(mid+pt+height/2,topleft[1]+sp+height+pt+height*0.8),(mid+pt+height*0.8,topleft[1]+sp+height+pt+height*0.2)],int(height/5))
+        if self.settings["Show Moves"]:
+            pygame.draw.lines(self.btn_surf,(35,225,25),False,[(mid+pt+height*0.2,topleft[1]+sp+2*(height+pt)+height/2),(mid+pt+height/2,topleft[1]+sp+2*(height+pt)+height*0.8),(mid+pt+height*0.8,topleft[1]+sp+2*(height+pt)+height*0.2)],int(height/5))
+        if self.settings["Flip Board"]:
+            pygame.draw.lines(self.btn_surf,(35,225,25),False,[(mid+pt+height*0.2,topleft[1]+sp+3*(height+pt)+height/2),(mid+pt+height/2,topleft[1]+sp+3*(height+pt)+height*0.8),(mid+pt+height*0.8,topleft[1]+sp+3*(height+pt)+height*0.2)],int(height/5))
+        if self.settings["debug"]:
+            pygame.draw.lines(self.btn_surf,(35,225,25),False,[(mid+pt+height*0.2,topleft[1]+sp+4*(height+pt)+height/2),(mid+pt+height/2,topleft[1]+sp+4*(height+pt)+height*0.8),(mid+pt+height*0.8,topleft[1]+sp+4*(height+pt)+height*0.2)],int(height/5))
+        if self.settings["probs"]:
+            pygame.draw.lines(self.btn_surf,(35,225,25),False,[(mid+pt+height*0.2,topleft[1]+sp+5*(height+pt)+height/2),(mid+pt+height/2,topleft[1]+sp+5*(height+pt)+height*0.8),(mid+pt+height*0.8,topleft[1]+sp+5*(height+pt)+height*0.2)],int(height/5))
+        self.btn_surf.blit(title,((bottomright[0]+topleft[0]-title.get_width())/2,topleft[1]))
+        self.btn_surf.blit(tx1,(mid-tx1.get_width(),topleft[1]+sp))
+        self.btn_surf.blit(tx2,(mid-tx2.get_width(),topleft[1]+sp+height+pt))
+        self.btn_surf.blit(tx3,(mid-tx3.get_width(),topleft[1]+sp+2*(height+pt)))
+        self.btn_surf.blit(tx4,(mid-tx4.get_width(),topleft[1]+sp+3*(height+pt)))
+        self.btn_surf.blit(tx5,(mid-tx5.get_width(),topleft[1]+sp+4*(height+pt)))
+        self.btn_surf.blit(tx6,(mid-tx6.get_width(),topleft[1]+sp+5*(height+pt)))
+        # self.btn_surf.blit(tx7,(mid-tx7.get_width(),topleft[1]+sp+6*(height+pt)))
+        if self.settings["debug"]: pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[0],2)
+    def disp_main(self):
+        size=self.display.get_size()
+        sc_rect=pygame.Rect(size[0]*0.35,size[1]/5,size[0]*0.3,size[1]*3/5)
+        title=pygame.font.SysFont("serif",size[0]//40).render("Backgammon",True,"black")
+        play_text=pygame.font.SysFont("serif",size[0]//45).render("Play",True,"black")
+        play_btn=play_text.get_rect(center=(sc_rect.centerx,sc_rect.top+4*title.get_height()))
+        play_btn=pygame.Rect(play_btn.left-size[0]/200,play_btn.top-size[0]/200,play_btn.width+size[0]/100,play_btn.height+size[0]/100)
+        settings_text=pygame.font.SysFont("serif",size[0]//45).render("Settings",True,"black")
+        settings_btn=settings_text.get_rect(center=(sc_rect.centerx,sc_rect.top+4*title.get_height()+1.5*play_btn.height))
+        settings_btn=pygame.Rect(settings_btn.left-size[0]/200,settings_btn.top-size[0]/200,settings_btn.width+size[0]/100,settings_btn.height+size[0]/100)
+        pygame.draw.rect(self.display,(164,151,151,240),sc_rect)
+        pygame.draw.rect(self.display,"black",sc_rect,int(size[0]/250))
+        self.display.blit(title,(sc_rect.centerx-title.get_width()/2,sc_rect.top+sc_rect.height/50))
+        pygame.draw.rect(self.display,"white",play_btn,0,10)
+        pygame.draw.rect(self.display,"white",settings_btn,0,10)
+        self.display.blit(play_text,(play_btn.left+size[0]/200,play_btn.top+size[0]/200))
+        self.display.blit(settings_text,(settings_btn.left+size[0]/200,settings_btn.top+size[0]/200))
+        self.window.blit(self.display,(0,0))
+    def main_menu(self):
+        size=self.display.get_size()
+        sc_rect=pygame.Rect(size[0]*0.35,size[1]/5,size[0]*0.3,size[1]*3/5)
+        title=pygame.font.SysFont("serif",size[0]//40).render("Backgammon",True,"black")
+        play_text=pygame.font.SysFont("serif",size[0]//45).render("Play",True,"black")
+        play_btn=play_text.get_rect(center=(sc_rect.centerx,sc_rect.top+4*title.get_height()))
+        play_btn=pygame.Rect(play_btn.left-size[0]/200,play_btn.top-size[0]/200,play_btn.width+size[0]/100,play_btn.height+size[0]/100)
+        settings_text=pygame.font.SysFont("serif",size[0]//45).render("Settings",True,"black")
+        settings_btn=settings_text.get_rect(center=(sc_rect.centerx,sc_rect.top+4*title.get_height()+1.5*play_btn.height))
+        settings_btn=pygame.Rect(settings_btn.left-size[0]/200,settings_btn.top-size[0]/200,settings_btn.width+size[0]/100,settings_btn.height+size[0]/100)
+        pygame.draw.rect(self.display,(164,151,151,240),sc_rect)
+        pygame.draw.rect(self.display,"black",sc_rect,int(size[0]/250))
+        self.display.blit(title,(sc_rect.centerx-title.get_width()/2,sc_rect.top+sc_rect.height/50))
+        pygame.draw.rect(self.display,"white",play_btn,0,10)
+        pygame.draw.rect(self.display,"white",settings_btn,0,10)
+        self.display.blit(play_text,(play_btn.left+size[0]/200,play_btn.top+size[0]/200))
+        self.display.blit(settings_text,(settings_btn.left+size[0]/200,settings_btn.top+size[0]/200))
+        self.window.blit(self.display,(0,0))
+        while True:
+            pygame.time.delay(10)
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type==MOUSEBUTTONDOWN:
+                    pos=pygame.mouse.get_pos()
+                    if play_btn.collidepoint(pos):
+                        pygame.draw.rect(self.display,(215,85,45),play_btn,0,10)
+                        self.display.blit(play_text,(play_btn.left+size[0]/200,play_btn.top+size[0]/200))
+                        self.window.blit(self.display,(0,0))
+                        pygame.display.update()
+                        time.sleep(0.1)
+                        pygame.draw.rect(self.display,"white",play_btn,0,10)
+                        self.display.blit(play_text,(play_btn.left+size[0]/200,play_btn.top+size[0]/200))
+                        self.window.blit(self.display,(0,0))
+                        pygame.display.update()
+                        time.sleep(0.3)
+                        self.play()
+                    if settings_btn.collidepoint(pos):
+                        pygame.draw.rect(self.display,(215,85,45),settings_btn,0,10)
+                        self.display.blit(settings_text,(settings_btn.left+size[0]/200,settings_btn.top+size[0]/200))
+                        self.window.blit(self.display,(0,0))
+                        pygame.display.update()
+                        time.sleep(0.1)
+                        pygame.draw.rect(self.display,"white",settings_btn,0,10)
+                        self.display.blit(settings_text,(settings_btn.left+size[0]/200,settings_btn.top+size[0]/200))
+                        self.window.blit(self.display,(0,0))
+                        pygame.display.update()
+                        time.sleep(0.3)
+                        self.btn_surf.fill("white")
+                        self.display.fill("white")
+                        self.window.blit(self.display,(0,0))
+                        pygame.display.update()
+                        self.settings_events()
+                pygame.display.update()
+if __name__=="__main__":
+    Game().main_menu()
