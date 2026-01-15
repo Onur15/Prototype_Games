@@ -4,12 +4,12 @@ from pygame.locals import *
 class Game():
     def __init__(self):
         pygame.init()
-        desktop_width=pygame.display.get_desktop_sizes()[0][0]
-        sc_width=int(desktop_width*17/20)
-        self.sc_ratio = 0.65
+        x = 0
+        sc_width=int((pygame.display.get_desktop_sizes()[0][0]-x)*0.98)
+        self.sc_ratio = pygame.display.get_desktop_sizes()[0][1]/pygame.display.get_desktop_sizes()[0][0]
         os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (0,25)
-        display = pygame.display.set_mode((desktop_width,sc_width*self.sc_ratio),pygame.RESIZABLE)
-        draw_surf = pygame.Surface((desktop_width,sc_width*self.sc_ratio), pygame.SRCALPHA)
+        display = pygame.display.set_mode((pygame.display.get_desktop_sizes()[0][0]-x,pygame.display.get_desktop_sizes()[0][1]-x*self.sc_ratio),pygame.RESIZABLE)
+        draw_surf = pygame.Surface((pygame.display.get_desktop_sizes()[0][0]-x,sc_width*self.sc_ratio), pygame.SRCALPHA)
         draw_surf.fill("white")
         pygame.display.set_caption("Tavla")
         width,height=draw_surf.get_width(),draw_surf.get_height()
@@ -28,7 +28,7 @@ class Game():
         self.select = [-1,0]
         self.window = display
         self.display = draw_surf
-        self.font = pygame.font.SysFont("serif", sc_width//50)
+        self.font = pygame.font.SysFont("serif", sc_width//60)
         self.over = True
         self.waiting = False
         self.table = []
@@ -120,7 +120,7 @@ class Game():
                 pygame.draw.polygon(self.display,(166,3,33),[(left+(w-12*rad)*(1+j)/7+(2*rad)*j+w+bar_width,height-4*pt),(left+(w-12*rad)*(1+j)/7+2*rad+(2*rad)*j+w+bar_width,height-4*pt),(left+rad+(w-12*rad)*(1+j)/7+(2*rad)*j+w+bar_width,height-4*pt-h*0.4)])   
         def disp_scores(self):
             scores = [f"{self.nicks[0]}'s Score: {self.scores["0"]}",f"{self.nicks[1]}'s Score: {self.scores["1"]}"]
-            font=pygame.font.SysFont("serif", self.display.get_width()//70)
+            font=pygame.font.SysFont("serif", self.display.get_width()//75)
             tx1=font.render(scores[0],True,"black")
             sz1=pygame.font.Font.size(self.font,scores[0])
             tx2=font.render(scores[1],True,"black")
@@ -375,6 +375,7 @@ class Game():
             self.window.blit(self.display,(0,0))
             self.button_screen()
             pygame.display.update()
+            return 1
         else: return -1
     def place(self, player, x):
         tb = self.table
@@ -767,19 +768,40 @@ class Game():
             if self.settings_btn.collidepoint(pos):
                 self.settings_events()
             for j in range(26): #0,25
-                if self.boxes[j].collidepoint(pos):
+                if self.boxes[j].collidepoint(pos) and event.button == 1:
                     j=j-1 #-1,24
                     if self.flipped: j=23-j
-                    if self.hit[str(self.turn-1)]!=0 and event.button==3:
+                    if self.hit[str(self.turn-1)]!=0:
                         if self.turn==1: j=j+1
                         if self.turn==2: j=24-j
                         if j in self.dice2:
                             self.place(self.turn,j-1)
-                            break
-                    if self.hit[str(self.turn-1)]!=0:
                         break
+                    if self.select[0]!=-1:
+                        success = False
+                        for i in range(self.select[1]):
+                            if self.dice2==[]:
+                                success = True
+                                self.select=[-1,-1]
+                                break
+                            moved = self.move(self.select[0],j)
+                            if success==False and moved==1:
+                                success=True
+                            if self.over: self.play()
+                        if success:
+                            if self.select[0] != -1:
+                                k=self.select[0]
+                                disp_orientation=self.settings["Display Orientation"]
+                                if self.flipped:
+                                    disp_orientation="right" if disp_orientation=="left" else "left"
+                                if disp_orientation == "right": 
+                                    if self.select[0]<12: k=11-self.select[0]
+                                    if self.select[0]>=12: k=35-self.select[0]
+                                if self.flipped: k=23-k
+                                self.draw_stones(p1c_sel,p2c_sel,k,self.select[1])
+                            break
                     if j in range(24): #0,23
-                        if self.table[j]["player"]!=self.turn and event.button==1:
+                        if self.table[j]["player"]!=self.turn:
                             self.select = [-1,-1]
                             self.display_table()
                             self.draw_dice()
@@ -787,7 +809,7 @@ class Game():
                             self.window.blit(self.display,(0,0))
                             self.button_screen()
                             break
-                        if self.table[j]["player"]==self.turn and event.button==1:
+                        if self.table[j]["player"]==self.turn:
                             k=j
                             disp_orientation=self.settings["Display Orientation"]
                             if self.flipped: 
@@ -809,14 +831,6 @@ class Game():
                             self.window.blit(self.display,(0,0))
                             self.button_screen()
                             break
-                    if event.button==3 and self.select[0]!=-1:
-                        for i in range(self.select[1]):
-                            if self.dice2==[]:
-                                self.select=[-1,-1]
-                                break
-                            self.move(self.select[0],j)
-                            if self.over: self.play()
-                        break
         if self.hit[str(self.turn-1)]!=0 and self.dice2!=[]: #Gele kontrolü
             t =[]
             for d in self.dice2:
@@ -1053,13 +1067,13 @@ class Game():
         width=self.display.get_width()
         height=self.display.get_height()
         main_text=self.font.render("Main Menu",True,"black")
-        main_btn=main_text.get_rect(bottomleft=(width-main_text.get_width()-4*pt,height-5*pt+bar_width/2))
+        main_btn=main_text.get_rect(bottomleft=(left+2*w+bar_width*3/2+width//200,height-main_text.get_height()-pt))
         main_btn.width+=pt; main_btn.height+=pt
         self.main_btn=main_btn
         self.btn_surf=pygame.Surface((width,height), pygame.SRCALPHA)
-        settings_btn=pygame.Rect(width-main_text.get_width()-4*pt+2,height/2-h/2,3*pt,3*pt)
+        settings_btn=pygame.Rect(main_btn.left,height/2-h/2,3*pt,3*pt)
         self.settings_btn=settings_btn
-        resign_btn=pygame.Rect(width-main_text.get_width()-4*pt+2,height/2+h/2-main_btn.height-2*pt,3*pt,3*pt)
+        resign_btn=pygame.Rect(main_btn.left,height/2+h/2-main_btn.height-2*pt,3*pt,3*pt)
         self.resign_btn=resign_btn
         if col!=0 and button==0:
             pygame.draw.rect(self.btn_surf,col,main_btn)
@@ -1070,16 +1084,16 @@ class Game():
         icon_rect=pygame.Rect(center[0]-r,center[1]-r,r,r)
         self.btn_surf.blit(main_text,(main_btn.left+pt/2,main_btn.top+pt/2))
         wid=resign_btn.width
-        pygame.draw.line(self.btn_surf,"black",(resign_btn.left+wid/5,resign_btn.bottom-wid/10),(resign_btn.left+wid/5,resign_btn.top+wid/10),3)
-        pygame.draw.rect(self.btn_surf,"black",(resign_btn.left+wid/5,resign_btn.top+wid/5,wid*0.6,wid/3),3)
+        pygame.draw.line(self.btn_surf,"black",(resign_btn.left+wid/5,resign_btn.bottom-wid/10),(resign_btn.left+wid/5,resign_btn.top+wid/10),2)
+        pygame.draw.rect(self.btn_surf,"black",(resign_btn.left+wid/5,resign_btn.top+wid/5,wid*0.6,wid/3),2)
         pygame.draw.rect(self.btn_surf,"black",resign_btn,2)
         pygame.draw.rect(self.btn_surf,"black",main_btn,2)
         pygame.draw.rect(self.btn_surf,"black",settings_btn,int(settings_btn.width/10))
         pygame.draw.circle(self.btn_surf,"black",center,r,int(r/2))
-        tl=(center[0]-r/4,icon_rect.top-r/3)
-        tr=(center[0]+r/4,icon_rect.top-r/3)
-        bl=(center[0]-r/4,center[1]-r/2)
-        br=(center[0]+r/4,center[1]-r/2)
+        tl=(center[0]-r/5,icon_rect.top-r/3)
+        tr=(center[0]+r/5,icon_rect.top-r/3)
+        bl=(center[0]-r/5,center[1]-r/2)
+        br=(center[0]+r/5,center[1]-r/2)
         n,phi=8,math.pi/8
         def rotate(coord,center,angle):
             z=complex(coord[0]-center[0],coord[1]-center[1])*complex(math.cos(angle),math.sin(angle))
@@ -1117,12 +1131,11 @@ class Game():
         pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[6],int(height/10))
         if self.settings["Display Orientation"]=="left":
             tx=font.render("Left",True,"black")
-            self.btn_surf.blit(tx,(mid+pt,topleft[1]+sp))
-            self.setting_buttons[0]=pygame.Rect(mid+pt,topleft[1]+sp,tx.get_width(),tx.get_height())
+            self.btn_surf.blit(tx,(mid+pt+(font.render("Right",True,"black").get_width()-tx.get_width())/2,topleft[1]+sp))
         if self.settings["Display Orientation"]=="right":
             tx=font.render("Right",True,"black")
             self.btn_surf.blit(tx,(mid+pt,topleft[1]+sp))
-            self.setting_buttons[0]=pygame.Rect(mid+pt,topleft[1]+sp,tx.get_width(),tx.get_height())
+        self.setting_buttons[0]=pygame.Rect(mid+pt/2,topleft[1]+sp,font.render("Right",True,"black").get_width()+pt,font.render("Right",True,"black").get_height())
         if self.settings["Show Scores"]:
             pygame.draw.lines(self.btn_surf,(35,225,25),False,[(mid+pt+height*0.2,topleft[1]+sp+height+pt+height/2),(mid+pt+height/2,topleft[1]+sp+height+pt+height*0.8),(mid+pt+height*0.8,topleft[1]+sp+height+pt+height*0.2)],int(height/5))
         if self.settings["Show Moves"]:
@@ -1141,7 +1154,7 @@ class Game():
         self.btn_surf.blit(tx5,(mid-tx5.get_width(),topleft[1]+sp+4*(height+pt)))
         self.btn_surf.blit(tx6,(mid-tx6.get_width(),topleft[1]+sp+5*(height+pt)))
         self.btn_surf.blit(tx7,(mid+height-tx7.get_width(),topleft[1]+sp+6*(height+pt)+pt/2))
-        if self.settings["debug"]: pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[0],2)
+        pygame.draw.rect(self.btn_surf,"black",self.setting_buttons[0],2)
     def nickname_settings(self):
         def update(self,surf,active):
             if self.over:
