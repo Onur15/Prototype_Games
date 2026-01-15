@@ -8,7 +8,7 @@ class Game():
         sc_width=int((pygame.display.get_desktop_sizes()[0][0]-x)*0.98)
         self.sc_ratio = pygame.display.get_desktop_sizes()[0][1]/pygame.display.get_desktop_sizes()[0][0]
         os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (0,25)
-        display = pygame.display.set_mode((pygame.display.get_desktop_sizes()[0][0]-x,pygame.display.get_desktop_sizes()[0][1]-x*self.sc_ratio),pygame.RESIZABLE)
+        display = pygame.display.set_mode((pygame.display.get_desktop_sizes()[0][0]-x,pygame.display.get_desktop_sizes()[0][1]-x*self.sc_ratio))
         draw_surf = pygame.Surface((pygame.display.get_desktop_sizes()[0][0]-x,sc_width*self.sc_ratio), pygame.SRCALPHA)
         draw_surf.fill("white")
         pygame.display.set_caption("Tavla")
@@ -119,7 +119,7 @@ class Game():
                 pygame.draw.polygon(self.display,(166,3,33),[(left+(w-12*rad)*(1+j)/7+(2*rad)*j,height-4*pt),(left+(w-12*rad)*(1+j)/7+2*rad+(2*rad)*j,height-4*pt),(left+rad+(w-12*rad)*(1+j)/7+(2*rad)*j,height-4*pt-h*0.4)])
                 pygame.draw.polygon(self.display,(166,3,33),[(left+(w-12*rad)*(1+j)/7+(2*rad)*j+w+bar_width,height-4*pt),(left+(w-12*rad)*(1+j)/7+2*rad+(2*rad)*j+w+bar_width,height-4*pt),(left+rad+(w-12*rad)*(1+j)/7+(2*rad)*j+w+bar_width,height-4*pt-h*0.4)])   
         def disp_scores(self):
-            scores = [f"{self.nicks[0]}'s Score: {self.scores["0"]}",f"{self.nicks[1]}'s Score: {self.scores["1"]}"]
+            scores = [f"{self.nicks[0]}'s Score: {self.scores['0']}",f"{self.nicks[1]}'s Score: {self.scores['1']}"]
             font=pygame.font.SysFont("serif", self.display.get_width()//75)
             tx1=font.render(scores[0],True,"black")
             sz1=pygame.font.Font.size(self.font,scores[0])
@@ -311,6 +311,7 @@ class Game():
                     self.wins[2]=player
                     if self.collected[str(3-player)]==0:
                         self.wins[player-1]+=1
+                    time.sleep(2)
                 return 1
             mx=max(self.dice2)
             if mx>check[1]:
@@ -333,6 +334,7 @@ class Game():
                     self.wins[2]=player
                     if self.collected[str(3-player)]==0:
                         self.wins[player-1]+=1
+                    time.sleep(2)
                 return 1            
             return -1
         if not(x1 in range(24)) or not(x2 in range(24)):
@@ -1190,10 +1192,10 @@ class Game():
                 pygame.draw.rect(surf,"white",inputbox2)
                 pygame.draw.rect(surf,"black",inputbox2,2)
             if active[0]:
-                pygame.draw.rect(surf,"dodgerblue2",inputbox1)
+                pygame.draw.rect(surf,(27,145,227),inputbox1)
                 pygame.draw.rect(surf,"black",inputbox1,2)
             if active[1]:
-                pygame.draw.rect(surf,"dodgerblue2",inputbox2)
+                pygame.draw.rect(surf,(27,145,227),inputbox2)
                 pygame.draw.rect(surf,"black",inputbox2,2)
         set_surf = pygame.Surface((self.display.get_width(),self.display.get_height()), pygame.SRCALPHA)
         if self.over:
@@ -1282,7 +1284,7 @@ class Game():
                         elif self.font.render(self.nicks[0],True,"black").get_width()<tx1.get_width()*1.2:
                             self.nicks[0]+=event.unicode
                         if event.key!=K_RETURN:
-                            pygame.draw.rect(set_surf,"dodgerblue2",inputbox1)
+                            pygame.draw.rect(set_surf,(27,145,227),inputbox1)
                             pygame.draw.rect(set_surf,"black",inputbox1,2)
                     if active[1]:
                         if first_click==2:
@@ -1297,7 +1299,7 @@ class Game():
                         elif self.font.render(self.nicks[1],True,"black").get_width()<tx1.get_width()*1.2:
                             self.nicks[1]+=event.unicode
                         if event.key!=K_RETURN:
-                            pygame.draw.rect(set_surf,"dodgerblue2",inputbox2)
+                            pygame.draw.rect(set_surf,(27,145,227),inputbox2)
                             pygame.draw.rect(set_surf,"black",inputbox2,2)
                     inp1=self.font.render(self.nicks[0],True,"black")
                     set_surf.blit(inp1,(inputbox1.left+pt/2,inputbox1.top))
