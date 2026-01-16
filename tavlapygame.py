@@ -1,15 +1,15 @@
 from random import randint
-import pygame, sys, os, time, math
+import pygame, sys, time, math
 from pygame.locals import *
 class Game():
     def __init__(self):
         pygame.init()
-        x = 0
-        sc_width=int((pygame.display.get_desktop_sizes()[0][0]-x)*0.98)
-        self.sc_ratio = pygame.display.get_desktop_sizes()[0][1]/pygame.display.get_desktop_sizes()[0][0]
-        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (0,25)
-        display = pygame.display.set_mode((pygame.display.get_desktop_sizes()[0][0]-x,pygame.display.get_desktop_sizes()[0][1]-x*self.sc_ratio))
-        draw_surf = pygame.Surface((pygame.display.get_desktop_sizes()[0][0]-x,sc_width*self.sc_ratio), pygame.SRCALPHA)
+        pygame.display.init()
+        info = pygame.display.Info()
+        sc_width=int(info.current_w*0.98)
+        self.sc_ratio = info.current_h/info.current_w
+        display = pygame.display.set_mode((info.current_w,info.current_h))
+        draw_surf = pygame.Surface((info.current_w,sc_width*self.sc_ratio), pygame.SRCALPHA)
         draw_surf.fill("white")
         pygame.display.set_caption("Tavla")
         width,height=draw_surf.get_width(),draw_surf.get_height()
@@ -608,7 +608,7 @@ class Game():
                 if event.type == QUIT:
                     pygame.quit()
                     sys.exit()
-                if event.type==MOUSEBUTTONDOWN:
+                if event.type in (MOUSEBUTTONDOWN, FINGERDOWN):
                     pos=pygame.mouse.get_pos()
                     if close_btn.collidepoint(pos):
                         if not self.over:
@@ -680,7 +680,7 @@ class Game():
                 if event.type == QUIT:
                     pygame.quit()
                     sys.exit()
-                if event.type==MOUSEBUTTONDOWN:
+                if event.type in (MOUSEBUTTONDOWN, FINGERDOWN):
                     pos=pygame.mouse.get_pos()
                     if no_btn.collidepoint(pos):
                         self.display_table()
@@ -699,7 +699,7 @@ class Game():
         p2c=[(225,225,225),(190,190,190)]
         p1c_sel=[(255,120,120,220),(210,100,100,220)]
         p2c_sel=[(250,250,250,220),(120,210,210,220)]
-        if event.type==MOUSEBUTTONDOWN:
+        if event.type in (MOUSEBUTTONDOWN, FINGERDOWN):
             pos = pygame.mouse.get_pos()
             if self.resign_btn.collidepoint(pos):
                 self.select=[-1,-1]
@@ -770,7 +770,7 @@ class Game():
             if self.settings_btn.collidepoint(pos):
                 self.settings_events()
             for j in range(26): #0,25
-                if self.boxes[j].collidepoint(pos) and event.button == 1:
+                if self.boxes[j].collidepoint(pos):
                     j=j-1 #-1,24
                     if self.flipped: j=23-j
                     if self.hit[str(self.turn-1)]!=0:
@@ -1012,7 +1012,7 @@ class Game():
         start_surf.blit(tx1,(btn1.left+pad,btn1.top+pad))
         start_surf.blit(tx2,(btn2.left+pad,btn2.top+pad))
         start_surf.blit(txd,(btnd.left+txd.get_width()/20,btnd.top+txd.get_height()/20))
-        if event.type==MOUSEBUTTONDOWN:
+        if event.type in (MOUSEBUTTONDOWN, FINGERDOWN):
             pos=pygame.mouse.get_pos()
             if btn1.collidepoint(pos):
                 pygame.draw.rect(start_surf,select_color,btn1,0,int(pad/2))
@@ -1241,7 +1241,7 @@ class Game():
                 if event.type == QUIT:
                     pygame.quit()
                     sys.exit()
-                if event.type==MOUSEBUTTONDOWN:
+                if event.type in (MOUSEBUTTONDOWN, FINGERDOWN):
                     if confirm_rect.collidepoint(event.pos):
                         if self.over:
                             set_surf.fill("white")
@@ -1265,6 +1265,10 @@ class Game():
                         first_click=2
                     else:
                         active=[False,False]
+                    if active[0] or active[1]:
+                        pygame.key.start_text_input()
+                    else:
+                        pygame.key.stop_text_input()
                     update(self,set_surf,active)
                     set_surf.blit(inp1,(inputbox1.left+pt/2,inputbox1.top))
                     set_surf.blit(inp2,(inputbox2.left+pt/2,inputbox2.top))
@@ -1275,30 +1279,32 @@ class Game():
                         if first_click==1:
                             self.nicks[0]=""
                             first_click=0
-                        if event.key==K_RETURN:
+                        if event.key in (K_RETURN, K_KP_ENTER):
                             active[0]=False
+                            pygame.key.stop_text_input()
                             pygame.draw.rect(set_surf,"white",inputbox1)
                             pygame.draw.rect(set_surf,"black",inputbox1,2)
                         elif event.key==K_BACKSPACE:
                             self.nicks[0]=self.nicks[0][:-1]
-                        elif self.font.render(self.nicks[0],True,"black").get_width()<tx1.get_width()*1.2:
+                        elif event.unicode and self.font.render(self.nicks[0],True,"black").get_width()<tx1.get_width()*1.2:
                             self.nicks[0]+=event.unicode
-                        if event.key!=K_RETURN:
+                        if not(event.key in (K_RETURN, K_KP_ENTER)):
                             pygame.draw.rect(set_surf,(27,145,227),inputbox1)
                             pygame.draw.rect(set_surf,"black",inputbox1,2)
                     if active[1]:
                         if first_click==2:
                             self.nicks[1]=""
                             first_click=0
-                        if event.key==K_RETURN:
+                        if event.key in (K_RETURN, K_KP_ENTER):
                             active[1]=False
+                            pygame.key.stop_text_input()
                             pygame.draw.rect(set_surf,"white",inputbox2)
                             pygame.draw.rect(set_surf,"black",inputbox2,2)
                         elif event.key==K_BACKSPACE:
                             self.nicks[1]=self.nicks[1][:-1]
-                        elif self.font.render(self.nicks[1],True,"black").get_width()<tx1.get_width()*1.2:
+                        elif event.unicode and self.font.render(self.nicks[1],True,"black").get_width()<tx1.get_width()*1.2:
                             self.nicks[1]+=event.unicode
-                        if event.key!=K_RETURN:
+                        if not(event.key in (K_RETURN, K_KP_ENTER)):
                             pygame.draw.rect(set_surf,(27,145,227),inputbox2)
                             pygame.draw.rect(set_surf,"black",inputbox2,2)
                     inp1=self.font.render(self.nicks[0],True,"black")
@@ -1350,7 +1356,7 @@ class Game():
                 if event.type == QUIT:
                     pygame.quit()
                     sys.exit()
-                if event.type==MOUSEBUTTONDOWN:
+                if event.type in (MOUSEBUTTONDOWN, FINGERDOWN):
                     pos=pygame.mouse.get_pos()
                     if play_btn.collidepoint(pos):
                         pygame.draw.rect(self.display,(215,85,45),play_btn,0,10)
